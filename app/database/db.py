@@ -38,8 +38,8 @@ class Database:
             ).scalar_one_or_none()
             if dimension is None:
                 raise RuntimeError("transcript_chunks.embedding column was not found")
-            # pgvector stores vector(n) as typmod n + 4.
-            actual_dimensions = int(dimension) - 4
+            # pgvector stores vector(n) dimensions directly in atttypmod.
+            actual_dimensions = int(dimension)
             if actual_dimensions != expected_dimensions:
                 raise RuntimeError(
                     f"Embedding dimension mismatch: database VECTOR({actual_dimensions}), "
