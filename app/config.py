@@ -63,6 +63,14 @@ class Settings(BaseSettings):
                 f"Supported models: {supported}."
             ) from error
 
+    @property
+    def cors_origins(self) -> list[str]:
+        """Return explicit browser origins allowed to call the retrieval API."""
+        origins = [origin.strip().rstrip("/") for origin in self.cors_allowed_origins.split(",") if origin.strip()]
+        if not origins or "*" in origins:
+            raise ConfigurationError("CORS_ALLOWED_ORIGINS must list explicit origins; wildcard origins are not allowed.")
+        return origins
+
     def validate_ai_requirements(self) -> None:
         """Validate credentials only for the integrations enabled in this command."""
         if self.embedding_provider == "jina" and not self.jina_api_key:
