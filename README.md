@@ -1,6 +1,6 @@
 # Ask Maharaj Ji — Phase 1 Ingestion
 
-Production-oriented ingestion for the Ask Maharaj Ji RAG system. It reads a timestamped transcript CSV, creates row-preserving semantic chunks, generates English retrieval metadata, creates multilingual embeddings, and stores the result in PostgreSQL with pgvector.
+Production-oriented ingestion for the Ask Maharaj Ji RAG system. It reads a timestamped transcript CSV, creates row-preserving semantic chunks, generates English retrieval metadata, creates multilingual embeddings, and stores the result in PostgreSQL with pgvector. It can also download captions for every available video in a YouTube playlist before ingesting them.
 
 Phase 1 intentionally includes no retrieval, search, HTTP API, reranking, answer generation, or chat UI.
 
@@ -14,6 +14,7 @@ The parser, chunker, metadata generator, provider adapters, and repository are i
 
 ```
 ingest.py                         CLI
+ingest_playlist.py                playlist download-and-ingest CLI
 app/config.py                     validated environment settings
 app/database/                     SQLAlchemy pool and repository
 app/models/                       transcript and chunk domain models
@@ -96,6 +97,20 @@ python ingest.py transcripts/example.csv --dry-run
 ```
 
 The dry-run summary also prints the first five created chunks with their indices, timestamps, and original transcript text. Jina embeds these chunks; it does not create them.
+
+### Playlist ingestion
+
+`ingest_playlist.py` uses `yt-dlp` to resolve a playlist without downloading video or audio. It fetches captions through `youtube-transcript-api`, writes a `start,end,text` CSV for each video to disk, and invokes the same `IngestionService` as the single-CSV CLI, one video at a time.
+
+```bash
+python ingest_playlist.py 'https://www.youtube.com/playlist?list=PLAYLIST_ID' \
+  --speaker 'Maharaj Ji' \
+  --languages hi en \
+  --transcript-dir transcripts/maharaj-ji \
+  --replace
+```
+
+`--languages` is the preferred-caption-language order; it defaults to `hi en`. `--dry-run` processes only the first two playlist videos, downloads their transcripts, parses them, generates metadata and embeddings, but makes no database writes. It prints the absolute path of every saved CSV. Each downloaded transcript is retained as `<video-id>.csv`, including when later ingestion fails. A missing or unavailable transcript is reported and does not stop subsequent playlist videos; the command exits with status `2` if any item failed.
 
 ### Diagnostic retrieval check
 
