@@ -97,6 +97,14 @@ python ingest.py transcripts/example.csv --dry-run
 
 The dry-run summary also prints the first five created chunks with their indices, timestamps, and original transcript text. Jina embeds these chunks; it does not create them.
 
+### Diagnostic retrieval check
+
+After ingestion, use the standalone diagnostic to verify pgvector similarity ordering. It embeds the query with Jina and prints the nearest chunks; it does not provide answer generation or an API.
+
+```bash
+python test_retrieval.py "What does Maharaj Ji say about devotion?" --video-id VIDEO_ID
+```
+
 ## Chunking and metadata
 
 Chunks target 600 tokens with a 120-token overlap by default. Token counting is Unicode-aware and sentence endings (including `।`) are preferred; chunks are still allowed to exceed the target to preserve a long, indivisible CSV row. Transcript text is never translated before metadata or embeddings. Metadata is JSONB with English `summary`, `keywords`, and `answerable_questions`.
