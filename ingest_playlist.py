@@ -31,6 +31,7 @@ def parse_args() -> argparse.Namespace:
                         help="Directory where downloaded <video-id>.csv files are kept")
     parser.add_argument("--replace", action="store_true", help="Replace chunks already stored for each video")
     parser.add_argument("--dry-run", action="store_true", help="Download and process transcripts without PostgreSQL writes")
+    parser.add_argument("--max-videos", type=int, help="Process at most this many videos in playlist order")
     return parser.parse_args()
 
 
@@ -53,7 +54,7 @@ def main() -> int:
         service = PlaylistIngestionService(YtDlpPlaylistSource(), YouTubeTranscriptDownloader(), ingestion)
         result = service.ingest_playlist(
             args.playlist_url, args.transcript_dir, speaker=args.speaker, languages=args.languages,
-            replace=args.replace, dry_run=args.dry_run,
+            replace=args.replace, dry_run=args.dry_run, max_videos=args.max_videos,
         )
         print(f"Playlist: {result.playlist_title}")
         print(f"Videos discovered: {result.videos_discovered}")

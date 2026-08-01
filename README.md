@@ -110,7 +110,7 @@ python ingest_playlist.py 'https://www.youtube.com/playlist?list=PLAYLIST_ID' \
   --replace
 ```
 
-`--languages` is the preferred-caption-language order; it defaults to `hi en`. `--dry-run` processes only the first two playlist videos, downloads their transcripts, parses them, generates metadata and embeddings, but makes no database writes. It prints the absolute path of every saved CSV. Each downloaded transcript is retained as `<video-id>.csv`, including when later ingestion fails. A missing or unavailable transcript is reported and does not stop subsequent playlist videos; the command exits with status `2` if any item failed.
+`--languages` is the preferred-caption-language order; it defaults to `hi en`. Use `--max-videos N` to limit a full run to the first `N` videos in playlist order. `--dry-run` processes only the first two playlist videos (or fewer when `--max-videos` is lower), downloads their transcripts, parses them, generates metadata and embeddings, but makes no database writes. It prints the absolute path of every saved CSV. Each downloaded transcript is retained as `<video-id>.csv`, including when later ingestion fails. A missing or unavailable transcript is reported and does not stop subsequent playlist videos; the command exits with status `2` if any item failed.
 
 ### Diagnostic retrieval check
 

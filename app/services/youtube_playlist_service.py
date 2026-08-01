@@ -118,13 +118,18 @@ class PlaylistIngestionService:
         self._ingestion_service = ingestion_service
 
     def ingest_playlist(self, playlist_url: str, transcript_directory: Path, *, speaker: str,
-                        languages: list[str], replace: bool = False, dry_run: bool = False) -> PlaylistIngestionSummary:
+                        languages: list[str], replace: bool = False, dry_run: bool = False,
+                        max_videos: int | None = None) -> PlaylistIngestionSummary:
         if not speaker.strip():
             raise ValueError("speaker must not be empty")
         if not languages:
             raise ValueError("languages must include at least one language code")
+        if max_videos is not None and max_videos < 1:
+            raise ValueError("max_videos must be at least 1")
         playlist_title, videos = self._playlist_source.list_videos(playlist_url)
-        selected_videos = videos[:2] if dry_run else videos
+        selected_videos = videos[:max_videos] if max_videos is not None else videos
+        if dry_run:
+            selected_videos = selected_videos[:2]
         ingested: list[IngestionSummary] = []
         failures: list[PlaylistIngestionFailure] = []
         transcript_paths: list[Path] = []

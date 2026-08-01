@@ -120,3 +120,19 @@ def test_playlist_dry_run_processes_only_the_first_two_and_reports_their_csvs(tm
     assert result.videos_processed == 2
     assert [call.video_id for call in ingestion.calls] == ["one", "two"]
     assert result.transcript_paths == (tmp_path / "one.csv", tmp_path / "two.csv")
+
+
+def test_playlist_max_videos_limits_a_full_run(tmp_path: Path) -> None:
+    ingestion = FakeIngestionService()
+    service = PlaylistIngestionService(  # type: ignore[arg-type]
+        ThreeVideoPlaylistSource(), SuccessfulTranscriptDownloader(), ingestion
+    )
+
+    result = service.ingest_playlist(
+        "https://www.youtube.com/playlist?list=PL123", tmp_path, speaker="Maharaj Ji", languages=["hi"],
+        max_videos=2,
+    )
+
+    assert result.videos_discovered == 3
+    assert result.videos_processed == 2
+    assert [call.video_id for call in ingestion.calls] == ["one", "two"]
