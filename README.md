@@ -131,3 +131,19 @@ Add embedding providers by implementing `BaseEmbeddingProvider` and registering 
 ## Phase 2
 
 Phase 2 can add vector retrieval, filtering, reranking, and an answer-serving API while reusing this ingestion schema and provider abstraction.
+
+## Retrieval API (Phase 2)
+
+The read-only FastAPI service embeds each query with Jina and returns the closest pgvector chunks. It does not generate answers.
+
+```bash
+uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+```bash
+curl -X POST http://127.0.0.1:8000/v1/retrieve \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"What does Maharaj Ji say about devotion?","limit":5}'
+```
+
+Use `GET /health` for readiness. The API requires `JINA_API_KEY` and PostgreSQL settings; it intentionally does not require Gemini metadata generation.
