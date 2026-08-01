@@ -147,3 +147,7 @@ curl -X POST http://127.0.0.1:8000/v1/retrieve \
 ```
 
 Use `GET /health` for readiness. The API requires `JINA_API_KEY` and PostgreSQL settings; it intentionally does not require Gemini metadata generation.
+
+### Browser CORS
+
+The retrieval API only permits origins listed in `CORS_ALLOWED_ORIGINS`. For local React development, keep `http://localhost:5173,http://127.0.0.1:5173`; add your final HTTPS frontend domain when it is deployed. Wildcard origins are rejected.

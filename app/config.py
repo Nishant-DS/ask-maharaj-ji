@@ -41,6 +41,7 @@ class Settings(BaseSettings):
     embedding_batch_size: int = Field(default=32, ge=1, le=256)
     request_timeout_seconds: float = Field(default=60, gt=0)
     max_retries: int = Field(default=3, ge=1, le=10)
+    cors_allowed_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
 
     @field_validator("chunk_overlap")
     @classmethod

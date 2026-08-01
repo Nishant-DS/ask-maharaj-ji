@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from app.config import Settings
@@ -24,6 +25,7 @@ class HealthResponse(BaseModel):
 
 def create_app(retrieval_service: RetrievalService | None = None) -> FastAPI:
     """Create the API, validating external dependencies at startup when needed."""
+    cors_settings = Settings(metadata_generation_enabled=False)
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         if retrieval_service is not None:
@@ -45,6 +47,13 @@ def create_app(retrieval_service: RetrievalService | None = None) -> FastAPI:
         version="0.2.0",
         description="Read-only semantic retrieval over ingested transcript chunks.",
         lifespan=lifespan,
+    )
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=cors_settings.cors_origins,
+        allow_credentials=False,
+        allow_methods=["GET", "POST"],
+        allow_headers=["Content-Type"],
     )
 
     @app.get("/health", response_model=HealthResponse)
