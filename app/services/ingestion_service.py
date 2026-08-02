@@ -85,7 +85,7 @@ class IngestionService:
                 if not replace:
                     raise ValueError("Video already exists; use --replace to replace its stored chunks.")
                 self._repository.delete_video(video.youtube_video_id)
-            stored = [PersistedChunk(**chunk.model_dump(), metadata=chunk.metadata, embedding=vector)
+            stored = [PersistedChunk(**chunk.model_dump(), embedding=vector)
                       for chunk, vector in zip(chunks, embeddings, strict=True)]
             insertion_started = perf_counter()
             self._repository.insert_chunks(video, stored)
