@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     postgres_password: SecretStr | None = None
     embedding_provider: Literal["jina", "gemini"] = "jina"
     embedding_model: str = "jina-embeddings-v3"
+    reranker_model: str = "jina-reranker-v3"
     llm_model: str = "gemini-2.5-flash"
     chunk_size: int = Field(default=600, ge=100)
     chunk_overlap: int = Field(default=120, ge=0)

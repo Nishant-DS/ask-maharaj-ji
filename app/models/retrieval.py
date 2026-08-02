@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 
 
 class RetrievedChunk(BaseModel):
-    """A chunk selected by cosine-distance retrieval."""
+    """A chunk selected by vector retrieval and optional reranking."""
 
     youtube_video_id: str
     youtube_url: str
@@ -23,11 +23,12 @@ class RetrievedChunk(BaseModel):
     chunk_text: str
     metadata: dict[str, Any] | None
     cosine_distance: float
+    reranker_score: float | None = None
 
 
 class RetrievalQuery(BaseModel):
     """Validated input for a retrieval request."""
 
     query: str = Field(min_length=1, max_length=2_000)
-    limit: int = Field(default=5, ge=1, le=20)
+    limit: int = Field(default=5, ge=3, le=5, description="Number of reranked chunks to return")
     youtube_video_id: str | None = Field(default=None, min_length=1)

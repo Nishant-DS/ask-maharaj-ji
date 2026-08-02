@@ -130,7 +130,7 @@ The CLI emits timestamped structured log records including transcript name, sour
 
 ## Environment variables
 
-Required for normal ingestion: `GOOGLE_API_KEY`, `JINA_API_KEY`, `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_DB`, `POSTGRES_USER`, and `POSTGRES_PASSWORD`. Dry runs require only the API keys. Optional settings are `CHUNK_SIZE`, `CHUNK_OVERLAP`, `EMBEDDING_BATCH_SIZE`, `REQUEST_TIMEOUT_SECONDS`, `MAX_RETRIES`, and `METADATA_GENERATION_ENABLED`.
+Required for normal ingestion: `GOOGLE_API_KEY`, `JINA_API_KEY`, `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_DB`, `POSTGRES_USER`, and `POSTGRES_PASSWORD`. Dry runs require only the API keys. Optional settings are `CHUNK_SIZE`, `CHUNK_OVERLAP`, `EMBEDDING_BATCH_SIZE`, `REQUEST_TIMEOUT_SECONDS`, `MAX_RETRIES`, `METADATA_GENERATION_ENABLED`, and `RERANKER_MODEL` (default: `jina-reranker-v3`).
 
 ## Troubleshooting
 
@@ -149,7 +149,7 @@ Phase 2 can add vector retrieval, filtering, reranking, and an answer-serving AP
 
 ## Retrieval API (Phase 2)
 
-The read-only FastAPI service embeds each query with Jina and returns the closest pgvector chunks. It does not generate answers.
+The read-only FastAPI service embeds each query with Jina, retrieves the top 20 pgvector candidates, reranks them with `jina-reranker-v3`, and returns the best 3–5 chunks. It does not generate answers.
 
 ```bash
 uvicorn app.main:app --host 0.0.0.0 --port 8000
