@@ -12,7 +12,7 @@ from app.database.db import Database
 from app.database.repository import TranscriptChunkRepository
 from app.services.ai.embedding_factory import EmbeddingFactory
 from app.services.ai.gemini_client import GeminiClient
-from app.services.ai.metadata_generator import MetadataGenerator
+from app.services.ai.semantic_section_generator import SemanticSectionGenerator
 from app.services.ingestion_service import IngestionService
 from app.services.youtube_playlist_service import (
     PlaylistIngestionService,
@@ -48,7 +48,7 @@ def main() -> int:
             repository = TranscriptChunkRepository(database.session_factory)
         ingestion = IngestionService(
             database, repository, EmbeddingFactory.create(settings),
-            MetadataGenerator(GeminiClient(settings), settings) if settings.metadata_generation_enabled else None,
+            SemanticSectionGenerator(GeminiClient(settings), settings),
             settings,
         )
         service = PlaylistIngestionService(YtDlpPlaylistSource(), YouTubeTranscriptDownloader(), ingestion)

@@ -14,7 +14,6 @@ from app.database.db import Database
 from app.database.repository import TranscriptChunkRepository
 from app.models.retrieval import RetrievedChunk, RetrievalQuery
 from app.services.ai.embedding_factory import EmbeddingFactory
-from app.services.ai.jina_reranker import JinaReranker
 from app.services.retrieval_service import RetrievalService
 
 
@@ -40,7 +39,6 @@ def create_app(retrieval_service: RetrievalService | None = None) -> FastAPI:
             app.state.retrieval_service = RetrievalService(
                 TranscriptChunkRepository(database.session_factory),
                 EmbeddingFactory.create(settings),
-                JinaReranker(settings),
             )
         yield
 

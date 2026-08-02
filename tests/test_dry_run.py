@@ -5,7 +5,7 @@ from app.services.ingestion_service import IngestionService
 
 
 class FakeEmbeddings:
-    def embed_batch(self, texts: list[str]) -> list[list[float]]:
+    def embed_batch(self, texts: list[str], task: str = "retrieval.passage") -> list[list[float]]:
         return [[0.0] * 1024 for _ in texts]
 
 

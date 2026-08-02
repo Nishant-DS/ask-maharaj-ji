@@ -1,18 +1,18 @@
 from app.models.retrieval import RetrievedChunk, RetrievalQuery
 from app.services.retrieval_service import RetrievalService
-from app.services.ai.base_reranker import RerankedDocument
 
 
 class FakeEmbeddings:
-    def embed_batch(self, texts: list[str]) -> list[list[float]]:
+    def embed_batch(self, texts: list[str], task: str = "retrieval.passage") -> list[list[float]]:
         assert texts == ["What is devotion?"]
+        assert task == "retrieval.query"
         return [[0.0] * 1024]
 
 
 class FakeRepository:
     def find_nearest_chunks(self, embedding: list[float], limit: int, youtube_video_id: str | None):
         assert len(embedding) == 1024
-        assert limit == 20
+        assert limit == 5
         assert youtube_video_id == "video-1"
         return [RetrievedChunk(
             youtube_video_id="video-1", youtube_url="https://youtube.test/watch?v=video-1",
@@ -22,16 +22,7 @@ class FakeRepository:
         )]
 
 
-class FakeReranker:
-    def rerank(self, query: str, documents: list[str], top_n: int) -> list[RerankedDocument]:
-        assert query == "What is devotion?"
-        assert documents == ["Bhakti."]
-        assert top_n == 1
-        return [RerankedDocument(index=0, relevance_score=0.98)]
-
-
 def test_retrieval_embeds_query_and_returns_matches() -> None:
-    service = RetrievalService(FakeRepository(), FakeEmbeddings(), FakeReranker())
+    service = RetrievalService(FakeRepository(), FakeEmbeddings())
     results = service.retrieve(RetrievalQuery(query="What is devotion?", youtube_video_id="video-1"))
     assert results[0].chunk_text == "Bhakti."
-    assert results[0].reranker_score == 0.98

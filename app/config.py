@@ -42,6 +42,11 @@ class Settings(BaseSettings):
     embedding_batch_size: int = Field(default=32, ge=1, le=256)
     request_timeout_seconds: float = Field(default=60, gt=0)
     max_retries: int = Field(default=3, ge=1, le=10)
+    questions_per_section: int = Field(default=3, ge=2, le=4)
+    generate_english: bool = True
+    generate_hindi: bool = True
+    generate_roman_hindi: bool = True
+    semantic_section_max_tokens: int = Field(default=2000, ge=200, le=8000)
     cors_allowed_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
 
     @field_validator("chunk_overlap")
@@ -81,9 +86,9 @@ class Settings(BaseSettings):
                 "Gemini embeddings are not configured in MODEL_DIMENSIONS. Use "
                 "EMBEDDING_PROVIDER=jina with jina-embeddings-v3."
             )
-        if self.metadata_generation_enabled and not self.google_api_key:
+        if not self.google_api_key:
             raise ConfigurationError(
-                "GOOGLE_API_KEY is required when METADATA_GENERATION_ENABLED=true. Add it to .env."
+                "GOOGLE_API_KEY is required for Gemini semantic sectioning. Add it to .env."
             )
         _ = self.embedding_dimensions
 

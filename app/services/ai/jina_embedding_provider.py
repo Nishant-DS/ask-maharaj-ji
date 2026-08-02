@@ -37,11 +37,11 @@ class JinaEmbeddingProvider(BaseEmbeddingProvider):
         self._max_retries = settings.max_retries
         self._client = client or httpx.Client(timeout=self._timeout)
 
-    def _request(self, texts: list[str]) -> list[list[float]]:
+    def _request(self, texts: list[str], task: str) -> list[list[float]]:
         response = self._client.post(
             self.endpoint,
             headers={"Authorization": f"Bearer {self._api_key}"},
-            json={"model": self._model, "input": texts},
+            json={"model": self._model, "input": texts, "task": task},
         )
         response.raise_for_status()
         data: Any = response.json().get("data")
@@ -53,7 +53,7 @@ class JinaEmbeddingProvider(BaseEmbeddingProvider):
             raise EmbeddingProviderError("Jina response has an invalid embedding format.") from error
         return vectors
 
-    def embed_batch(self, texts: list[str]) -> list[list[float]]:
+    def embed_batch(self, texts: list[str], task: str = "retrieval.passage") -> list[list[float]]:
         """Embed one batch and validate result count and fixed model dimensionality."""
         if not texts:
             return []
@@ -66,12 +66,17 @@ class JinaEmbeddingProvider(BaseEmbeddingProvider):
                     "Retrying transient Jina request", extra={"attempt": state.attempt_number}
                 ),
             )
-            vectors = retrying(self._request, texts)
+            vectors = retrying(self._request, texts, task)
         except httpx.HTTPStatusError as error:
             status = error.response.status_code
             if status in {401, 403}:
                 raise EmbeddingProviderError("Jina authentication failed. Check JINA_API_KEY.") from error
-            raise EmbeddingProviderError(f"Jina API request failed with HTTP {status}.") from error
+            try:
+                detail = error.response.json().get("detail") or error.response.json().get("message")
+            except ValueError:
+                detail = None
+            suffix = f" {detail}" if isinstance(detail, str) else ""
+            raise EmbeddingProviderError(f"Jina API request failed with HTTP {status}.{suffix}") from error
         except (httpx.TimeoutException, httpx.NetworkError) as error:
             raise EmbeddingProviderError("Jina API is unreachable after retries. Check network connectivity.") from error
         if len(vectors) != len(texts):

@@ -29,7 +29,8 @@ class TranscriptParser:
                 try:
                     text = (row.get("text") or "").strip()
                     segment = TranscriptSegment(
-                        start_second=float(row["start"]), end_second=float(row["end"]), text=text
+                        start_second=float(row["start"]), end_second=float(row["end"]), text=text,
+                        row_index=row_number - 1,
                     )
                     if segment.end_second < segment.start_second:
                         raise TranscriptParseError("end precedes start")

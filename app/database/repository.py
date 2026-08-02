@@ -23,6 +23,8 @@ transcript_chunks = Table(
     Column("title", Text, nullable=False), Column("speaker", Text, nullable=False),
     Column("language", Text), Column("discourse_date", Date), Column("chunk_index", Integer, nullable=False),
     Column("start_second", Integer, nullable=False), Column("end_second", Integer, nullable=False),
+    Column("section_id", UUID(as_uuid=True)), Column("record_type", Text, nullable=False, server_default="transcript"),
+    Column("row_start", Integer), Column("row_end", Integer),
     Column("chunk_text", Text, nullable=False), Column("metadata", JSONB), Column("embedding", Vector()),
 )
 
@@ -48,17 +50,24 @@ class TranscriptChunkRepository:
     ) -> list[RetrievedChunk]:
         """Return chunks ordered by pgvector cosine distance without applying business policy."""
         query = """
-            SELECT youtube_video_id, youtube_url, title, speaker, language, discourse_date,
-                   chunk_index, start_second, end_second, chunk_text, metadata,
-                   embedding <=> CAST(:embedding AS vector) AS cosine_distance
-            FROM transcript_chunks
-            WHERE embedding IS NOT NULL
+            WITH candidates AS (
+                SELECT id, COALESCE(section_id, id) AS grouped_section_id,
+                       embedding <=> CAST(:embedding AS vector) AS cosine_distance
+                FROM transcript_chunks WHERE embedding IS NOT NULL
         """
         params: dict[str, Any] = {"embedding": "[" + ",".join(map(str, embedding)) + "]", "limit": limit}
         if youtube_video_id:
             query += " AND youtube_video_id = :youtube_video_id"
             params["youtube_video_id"] = youtube_video_id
-        query += " ORDER BY embedding <=> CAST(:embedding AS vector) LIMIT :limit"
+        query += " ORDER BY embedding <=> CAST(:embedding AS vector) LIMIT 50), ranked AS ("
+        query += " SELECT DISTINCT ON (grouped_section_id) grouped_section_id, cosine_distance FROM candidates"
+        query += " ORDER BY grouped_section_id, cosine_distance), sections AS ("
+        query += " SELECT t.*, ranked.cosine_distance FROM transcript_chunks t JOIN ranked"
+        query += " ON COALESCE(t.section_id, t.id) = ranked.grouped_section_id"
+        query += " WHERE t.record_type = 'transcript')"
+        query += " SELECT youtube_video_id, youtube_url, title, speaker, language, discourse_date, chunk_index,"
+        query += " start_second, end_second, section_id, record_type, row_start, row_end, chunk_text, metadata, cosine_distance"
+        query += " FROM sections ORDER BY cosine_distance LIMIT :limit"
         with self._session_factory() as session:
             rows = session.execute(text(query), params).mappings().all()
         return [RetrievedChunk.model_validate(dict(row)) for row in rows]
@@ -69,7 +78,8 @@ class TranscriptChunkRepository:
             "id": uuid4(), "youtube_video_id": video.youtube_video_id, "youtube_url": str(video.youtube_url),
             "title": video.title, "speaker": video.speaker, "language": video.language,
             "discourse_date": video.discourse_date, "chunk_index": chunk.chunk_index,
-            "start_second": chunk.start_second, "end_second": chunk.end_second,
+            "start_second": chunk.start_second, "end_second": chunk.end_second, "section_id": chunk.section_id,
+            "record_type": chunk.record_type, "row_start": chunk.row_start, "row_end": chunk.row_end,
             "chunk_text": chunk.chunk_text, "metadata": chunk.metadata, "embedding": chunk.embedding,
         } for chunk in chunks]
         with self._session_factory() as session, session.begin():

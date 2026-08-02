@@ -48,6 +48,8 @@ CREATE EXTENSION IF NOT EXISTS vector;
 
 This project deliberately does not create migrations or alter your schema. Before ingestion it verifies connectivity, the `vector` extension, the `transcript_chunks.embedding` column, and its vector dimension.
 
+Before deploying semantic-section ingestion, run `migrations/001_semantic_sections.sql` once against PostgreSQL. It adds `section_id`, `record_type`, `row_start`, and `row_end` to the existing `transcript_chunks` table; no second table is created.
+
 ### Vector dimension
 
 The database embedding column must be `VECTOR(1024)` for `jina-embeddings-v3`. The dimension is derived from the model in code and is intentionally not an environment variable. The pipeline validates both returned vectors and the database column before writing.
@@ -87,6 +89,15 @@ python ingest.py transcripts/example.csv \
 ```
 
 Use `--replace` to explicitly delete an already-ingested video's existing chunks before replacing them. Without it, duplicate ingestion fails safely.
+
+To ingest previously downloaded playlist CSVs, pass their directory instead. Files must be named `<youtube-video-id>.csv`; the command processes them sequentially and continues after an individual file fails. In full mode, `--speaker` is required and the filename supplies each video ID and canonical YouTube URL. Use `--title` optionally as a common title prefix.
+
+```bash
+python ingest.py transcripts/maharaj-ji \
+  --speaker "Maharaj Ji" \
+  --language hi \
+  --replace
+```
 
 ### Dry run
 
@@ -130,7 +141,7 @@ The CLI emits timestamped structured log records including transcript name, sour
 
 ## Environment variables
 
-Required for normal ingestion: `GOOGLE_API_KEY`, `JINA_API_KEY`, `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_DB`, `POSTGRES_USER`, and `POSTGRES_PASSWORD`. Dry runs require only the API keys. Optional settings are `CHUNK_SIZE`, `CHUNK_OVERLAP`, `EMBEDDING_BATCH_SIZE`, `REQUEST_TIMEOUT_SECONDS`, `MAX_RETRIES`, `METADATA_GENERATION_ENABLED`, and `RERANKER_MODEL` (default: `jina-reranker-v3`).
+Required for normal ingestion: `GOOGLE_API_KEY`, `JINA_API_KEY`, `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_DB`, `POSTGRES_USER`, and `POSTGRES_PASSWORD`. Dry runs require only the API keys. Optional settings are `EMBEDDING_BATCH_SIZE`, `REQUEST_TIMEOUT_SECONDS`, `MAX_RETRIES`, `METADATA_GENERATION_ENABLED`, `QUESTIONS_PER_SECTION` (default `3`), `GENERATE_ENGLISH`, `GENERATE_HINDI`, `GENERATE_ROMAN_HINDI`, and `SEMANTIC_SECTION_MAX_TOKENS` (default `2000`).
 
 ## Troubleshooting
 
@@ -149,7 +160,7 @@ Phase 2 can add vector retrieval, filtering, reranking, and an answer-serving AP
 
 ## Retrieval API (Phase 2)
 
-The read-only FastAPI service embeds each query with Jina, retrieves the top 20 pgvector candidates, reranks them with `jina-reranker-v3`, and returns the best 3–5 chunks. It does not generate answers.
+The read-only FastAPI service embeds each query with Jina, searches transcript sections and generated-question aliases, groups the top 50 vector matches by section, and returns the best 3–5 original transcript sections. It does not generate answers.
 
 ```bash
 uvicorn app.main:app --host 0.0.0.0 --port 8000

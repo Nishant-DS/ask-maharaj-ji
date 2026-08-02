@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 from typing import Any
+from uuid import UUID
 
 from pydantic import BaseModel, Field
 
@@ -24,6 +25,10 @@ class RetrievedChunk(BaseModel):
     metadata: dict[str, Any] | None
     cosine_distance: float
     reranker_score: float | None = None
+    section_id: UUID | None = None
+    record_type: str = "transcript"
+    row_start: int | None = None
+    row_end: int | None = None
 
 
 class RetrievalQuery(BaseModel):

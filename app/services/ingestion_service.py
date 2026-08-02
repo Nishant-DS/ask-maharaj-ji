@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 from time import perf_counter
+from uuid import uuid4
 
 from pydantic import BaseModel, HttpUrl
 
@@ -15,9 +16,9 @@ from app.database.db import Database
 from app.database.repository import TranscriptChunkRepository
 from app.models.chunk import PersistedChunk, SemanticChunk
 from app.services.ai.base_embedding_provider import BaseEmbeddingProvider
-from app.services.ai.metadata_generator import MetadataGenerator
-from app.services.chunking import SemanticChunker
+from app.services.ai.semantic_section_generator import SectionProposal, SemanticSectionGenerator
 from app.services.transcript_parser import TranscriptParser
+from app.services.transcript_reconstructor import TranscriptReconstructor
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +55,7 @@ class IngestionService:
     """Coordinate parser, chunker, AI adapters, and persistence dependencies."""
 
     def __init__(self, database: Database | None, repository: TranscriptChunkRepository | None,
-                 embedding_provider: BaseEmbeddingProvider, metadata_generator: MetadataGenerator | None,
+                 embedding_provider: BaseEmbeddingProvider, metadata_generator: SemanticSectionGenerator | None,
                  settings: Settings) -> None:
         self._database, self._repository = database, repository
         self._embedding_provider, self._metadata_generator, self._settings = (
@@ -67,11 +68,11 @@ class IngestionService:
         started = perf_counter()
         logger.info("Reading transcript", extra={"transcript": transcript_path.name})
         segments = TranscriptParser().parse(transcript_path)
-        chunks = SemanticChunker(self._settings.chunk_size, self._settings.chunk_overlap).chunk(segments)
-        logger.info("Created chunks", extra={"transcript_rows": len(segments), "chunks": len(chunks)})
+        reconstructed = TranscriptReconstructor().reconstruct(segments)
         metadata_started = perf_counter()
-        metadata = self._generate_metadata(chunks)
+        chunks = self._create_section_records(reconstructed)
         metadata_seconds = perf_counter() - metadata_started
+        logger.info("Created semantic section records", extra={"transcript_rows": len(segments), "records": len(chunks)})
         embedding_started = perf_counter()
         embeddings = self._generate_embeddings([chunk.chunk_text for chunk in chunks])
         embedding_seconds = perf_counter() - embedding_started
@@ -84,8 +85,8 @@ class IngestionService:
                 if not replace:
                     raise ValueError("Video already exists; use --replace to replace its stored chunks.")
                 self._repository.delete_video(video.youtube_video_id)
-            stored = [PersistedChunk(**chunk.model_dump(), metadata=item_metadata, embedding=vector)
-                      for chunk, item_metadata, vector in zip(chunks, metadata, embeddings, strict=True)]
+            stored = [PersistedChunk(**chunk.model_dump(), metadata=chunk.metadata, embedding=vector)
+                      for chunk, vector in zip(chunks, embeddings, strict=True)]
             insertion_started = perf_counter()
             self._repository.insert_chunks(video, stored)
             database_seconds = perf_counter() - insertion_started
@@ -95,7 +96,8 @@ class IngestionService:
             embedding_dimension=self._settings.embedding_dimensions,
             metadata_generated=self._metadata_generator is not None, metadata_seconds=metadata_seconds,
             embedding_seconds=embedding_seconds, database_seconds=database_seconds,
-            total_seconds=total_seconds, dry_run=dry_run, preview_chunks=tuple(chunks[:5]),
+            total_seconds=total_seconds, dry_run=dry_run,
+            preview_chunks=tuple(chunk for chunk in chunks if chunk.record_type == "transcript")[:5],
         )
         logger.info(
             "Completed ingestion transcript=%s rows=%d chunks=%d metadata_seconds=%.3f "
@@ -107,13 +109,34 @@ class IngestionService:
         )
         return summary
 
-    def _generate_metadata(self, chunks: list[SemanticChunk]) -> list[dict[str, object] | None]:
-        if self._metadata_generator is None:
-            return [None] * len(chunks)
-        return [self._metadata_generator.generate(chunk.chunk_text) for chunk in chunks]
+    def _create_section_records(self, rows: list[object]) -> list[SemanticChunk]:
+        proposals = self._metadata_generator.generate(rows) if self._metadata_generator else [SectionProposal(
+            start_row=rows[0].row_start, end_row=rows[-1].row_end, topic="Transcript", summary="Transcript section",
+            questions=[],
+        )]
+        records: list[SemanticChunk] = []
+        for index, proposal in enumerate(proposals):
+            selected = [row for row in rows if row.row_end >= proposal.start_row and row.row_start <= proposal.end_row]
+            if not selected:
+                raise ValueError("Gemini section does not cover reconstructed transcript content")
+            section_id = uuid4()
+            metadata = {"topic": proposal.topic, "summary": proposal.summary, "section_id": str(section_id),
+                        "record_type": "transcript", "row_start": proposal.start_row, "row_end": proposal.end_row,
+                        "questions": proposal.questions}
+            records.append(SemanticChunk(chunk_index=index, start_second=round(selected[0].start_second),
+                end_second=round(selected[-1].end_second), chunk_text=" ".join(row.text for row in selected),
+                section_id=section_id, record_type="transcript", row_start=proposal.start_row, row_end=proposal.end_row,
+                metadata=metadata))
+            for question in proposal.questions:
+                records.append(SemanticChunk(chunk_index=index, start_second=round(selected[0].start_second),
+                    end_second=round(selected[-1].end_second), chunk_text=question, section_id=section_id,
+                    record_type="generated_question", row_start=proposal.start_row, row_end=proposal.end_row,
+                    metadata={**metadata, "record_type": "generated_question"}))
+        return records
 
     def _generate_embeddings(self, texts: list[str]) -> list[list[float]]:
         vectors: list[list[float]] = []
         for offset in range(0, len(texts), self._settings.embedding_batch_size):
-            vectors.extend(self._embedding_provider.embed_batch(texts[offset:offset + self._settings.embedding_batch_size]))
+            vectors.extend(self._embedding_provider.embed_batch(
+                texts[offset:offset + self._settings.embedding_batch_size], task="retrieval.passage"))
         return vectors

@@ -1,0 +1,9 @@
+Return JSON only. No markdown, prose, timestamps, or fields beyond this schema:
+{{"sections":[{{"start_row":1,"end_row":2,"topic":"...","summary":"...","questions":["..."]}}]}}
+
+Split the reconstructed transcript into complete, logical teachings. Keep a question and its full answer together; never split inside an answer and never use arbitrary character limits. Use only source row indexes that appear in the transcript. Never invent timing or rows.
+
+For every section generate exactly {questions_per_section} questions TOTAL, never per language and never more than {questions_per_section}. This total includes all enabled languages combined. Distribute the questions across the enabled languages where possible: English={generate_english}, Hindi={generate_hindi}, Roman Hindi={generate_roman_hindi}. Questions must be realistic user searches grounded only in the section.
+
+Reconstructed transcript:
+{transcript}
